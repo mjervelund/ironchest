@@ -98,6 +98,9 @@ public class ChestUpgradeItem extends Item {
           iBlockState = IronChestsTypes.get(this.type.target).get(0).defaultBlockState();
         }
 
+        // Roll a pending loot table (dungeon/structure chest) first, as opening would; getItems() does not.
+        chest.unpackLootTable(entityPlayer);
+
         chestContents = chest.getItems();
         chestFacing = chestState.getValue(AbstractIronChestBlock.FACING);
         customName = chest.getCustomName();
@@ -119,6 +122,8 @@ public class ChestUpgradeItem extends Item {
         if (!this.type.canUpgrade(IronChestsTypes.WOOD)) {
           return InteractionResult.PASS;
         }
+
+        chest.unpackLootTable(entityPlayer);
 
         chestContents = NonNullList.withSize(chest.getContainerSize(), ItemStack.EMPTY);
 
