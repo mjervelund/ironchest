@@ -53,14 +53,18 @@ public interface ICrystalChest {
 
   void receiveMessageFromServer(NonNullList<ItemStack> topStacks);
 
-  default void sortTopStacks() {
-    if (!this.getChestType().isTransparent() || (this.getChestLevel() != null && this.getChestLevel().isClientSide())) {
-      return;
+  /**
+   * The chest's top stacks computed from its current items (merged by item and components, largest first), without
+   * changing any state. Used by {@link #sortTopStacks()} and for the block entity's update tag.
+   */
+  default NonNullList<ItemStack> computeTopStacks() {
+    NonNullList<ItemStack> topStacks = NonNullList.<ItemStack>withSize(this.getTopItems().size(), ItemStack.EMPTY);
+
+    if (!this.getChestType().isTransparent()) {
+      return topStacks;
     }
 
     NonNullList<ItemStack> tempCopy = NonNullList.<ItemStack>withSize(IronChestsTypes.CRYSTAL.size, ItemStack.EMPTY);
-
-    boolean hasStuff = false;
 
     int compressedIdx = 0;
 
@@ -84,8 +88,47 @@ public interface ICrystalChest {
         tempCopy.set(compressedIdx, itemStack.copy());
 
         compressedIdx++;
+      }
+    }
 
+    tempCopy.sort((stack1, stack2) -> {
+      if (stack1.isEmpty()) {
+        return 1;
+      } else if (stack2.isEmpty()) {
+        return -1;
+      } else {
+        return stack2.getCount() - stack1.getCount();
+      }
+    });
+
+    int slot = 0;
+
+    for (ItemStack itemStack : tempCopy) {
+      if (!itemStack.isEmpty() && itemStack.getCount() > 0) {
+        if (slot == topStacks.size()) {
+          break;
+        }
+
+        topStacks.set(slot, itemStack);
+
+        slot++;
+      }
+    }
+
+    return topStacks;
+  }
+
+  default void sortTopStacks() {
+    if (!this.getChestType().isTransparent() || (this.getChestLevel() != null && this.getChestLevel().isClientSide())) {
+      return;
+    }
+
+    boolean hasStuff = false;
+
+    for (ItemStack itemStack : this.getCurrentItems()) {
+      if (!itemStack.isEmpty()) {
         hasStuff = true;
+        break;
       }
     }
 
@@ -107,32 +150,10 @@ public interface ICrystalChest {
 
     this.setHadStuff(true);
 
-    tempCopy.sort((stack1, stack2) -> {
-      if (stack1.isEmpty()) {
-        return 1;
-      } else if (stack2.isEmpty()) {
-        return -1;
-      } else {
-        return stack2.getCount() - stack1.getCount();
-      }
-    });
+    NonNullList<ItemStack> topStacks = this.computeTopStacks();
 
-    int slot = 0;
-
-    for (ItemStack itemStack : tempCopy) {
-      if (!itemStack.isEmpty() && itemStack.getCount() > 0) {
-        if (slot == this.getTopItems().size()) {
-          break;
-        }
-
-        this.getTopItems().set(slot, itemStack);
-
-        slot++;
-      }
-    }
-
-    for (int i = slot; i < this.getTopItems().size(); i++) {
-      this.getTopItems().set(i, ItemStack.EMPTY);
+    for (int i = 0; i < this.getTopItems().size(); i++) {
+      this.getTopItems().set(i, topStacks.get(i));
     }
 
     if (this.getChestLevel() != null) {
