@@ -2,10 +2,15 @@ package com.progwml6.ironchest.common.block.regular.entity;
 
 import com.progwml6.ironchest.IronChests;
 import com.progwml6.ironchest.common.block.IronChestsTypes;
+import com.progwml6.ironchest.common.block.entity.ICrystalChest;
 import com.progwml6.ironchest.common.block.regular.AbstractIronChestBlock;
 import com.progwml6.ironchest.common.inventory.IronChestMenu;
+import com.mojang.serialization.Codec;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.NonNullList;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
@@ -29,9 +34,14 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 
+import java.util.List;
 import java.util.function.Supplier;
 
 public abstract class AbstractIronChestBlockEntity extends RandomizableContainerBlockEntity implements LidBlockEntity {
+
+  /** Crystal chests: the top stacks in the update tag, so a client that starts tracking the chest shows them. */
+  private static final String TOP_STACKS_TAG = "ironchest:top_stacks";
+  private static final Codec<List<ItemStack>> TOP_STACKS_CODEC = ItemStack.OPTIONAL_CODEC.listOf();
 
   private NonNullList<ItemStack> items;
 
@@ -94,6 +104,29 @@ public abstract class AbstractIronChestBlockEntity extends RandomizableContainer
     if (!this.tryLoadLootTable(input)) {
       ContainerHelper.loadAllItems(input, this.items);
     }
+
+    if (this instanceof ICrystalChest crystalChest) {
+      input.read(TOP_STACKS_TAG, TOP_STACKS_CODEC).ifPresent(stacks -> {
+        NonNullList<ItemStack> topStacks = NonNullList.withSize(crystalChest.getTopItems().size(), ItemStack.EMPTY);
+
+        for (int i = 0; i < stacks.size() && i < topStacks.size(); i++) {
+          topStacks.set(i, stacks.get(i));
+        }
+
+        crystalChest.receiveMessageFromServer(topStacks);
+      });
+    }
+  }
+
+  @Override
+  public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+    CompoundTag tag = super.getUpdateTag(registries);
+
+    if (this instanceof ICrystalChest crystalChest) {
+      tag.store(TOP_STACKS_TAG, TOP_STACKS_CODEC, registries.createSerializationContext(NbtOps.INSTANCE), crystalChest.computeTopStacks());
+    }
+
+    return tag;
   }
 
   @Override
