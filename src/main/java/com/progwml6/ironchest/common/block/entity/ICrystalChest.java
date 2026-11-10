@@ -152,6 +152,21 @@ public interface ICrystalChest {
 
     NonNullList<ItemStack> topStacks = this.computeTopStacks();
 
+    // getItem() marks the chest touched, so automation polling it (hoppers, pipes) re-sorts it every tick: only update
+    // and resend the top stacks when they changed.
+    boolean changed = false;
+
+    for (int i = 0; i < this.getTopItems().size(); i++) {
+      if (!ItemStack.matches(this.getTopItems().get(i), topStacks.get(i))) {
+        changed = true;
+        break;
+      }
+    }
+
+    if (!changed) {
+      return;
+    }
+
     for (int i = 0; i < this.getTopItems().size(); i++) {
       this.getTopItems().set(i, topStacks.get(i));
     }
