@@ -102,6 +102,15 @@ public interface ICrystalChest {
         this.getChestLevel().sendBlockUpdated(this.getChestWorldPosition(), blockState, blockState, 3);
       }
 
+      // The top stacks reach clients only through this packet (no update packet), so the now empty list must be sent too.
+      this.sendTopStacksPacket();
+
+      return;
+    }
+
+    if (!hasStuff) {
+      // Still empty: clients already show no top stacks. (Falling through would flip hadStuff and empty the chest
+      // again on the next poll, a sync every other tick.)
       return;
     }
 
